@@ -818,7 +818,7 @@ namespace BetterTimeWarp
 
         void FixedUpdate()
         {
-            if (TimeWarp.fetch != null &&  TimeWarp.fetch.Mode == TimeWarp.Modes.HIGH && UseLosslessPhysics && Time.timeScale < 100f)
+            if (TimeWarp.fetch != null && UseLosslessPhysics && Time.timeScale < 100f)
             {
                 if (Time.timeScale == 1f)
                 {
