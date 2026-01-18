@@ -162,3 +162,6 @@
 2.3.14
 	Added option to enable infinite EC when timewarp gets too high
 	Added dropdown to spacecenter
+
+2.3.14.1
+	Fix bug where multiple buttons were being added to the toolbar after each scene change

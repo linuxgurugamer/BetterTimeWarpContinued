@@ -36,9 +36,9 @@ namespace BetterTimeWarp
             }
         }
 
-        ToolbarControl toolbarControl;
+        static ToolbarControl toolbarControl;
 
-        private bool hasAdded = false;
+        private static bool hasAdded = false;
 
         static Texture2D upArrow;
         static Texture2D downArrow;
@@ -86,7 +86,7 @@ namespace BetterTimeWarp
 
 
             //add the toolbar button to non-flight scenes
-            if (!hasAdded && HighLogic.CurrentGame.Parameters.CustomParams<BTWCustomParams>().enabled && !HighLogic.CurrentGame.Parameters.CustomParams<BTWCustomParams>().hideButton)
+            if (toolbarControl == null && !hasAdded && HighLogic.CurrentGame.Parameters.CustomParams<BTWCustomParams>().enabled && !HighLogic.CurrentGame.Parameters.CustomParams<BTWCustomParams>().hideButton)
             {
                 if (!HighLogic.CurrentGame.Parameters.CustomParams<BTWCustomParams>().hideButtonInFlight || HighLogic.LoadedScene != GameScenes.FLIGHT)
                 {
@@ -155,6 +155,7 @@ namespace BetterTimeWarp
             {
                 toolbarControl.OnDestroy();
                 Destroy(toolbarControl);
+                toolbarControl = null;
             }
         }
 
