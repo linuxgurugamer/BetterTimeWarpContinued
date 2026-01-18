@@ -1,26 +1,24 @@
-using System;
-using System.Linq;
-using System.Collections.Generic;
-using UnityEngine;
+using ClickThroughFix;
 using CommNet;
 using KSP.UI.Screens;
 using KSP.UI.Screens.Flight;
-
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
-using ClickThroughFix;
 using ToolbarControl_NS;
-
-//using NearFutureElectrical;
+using UnityEngine;
 
 namespace BetterTimeWarp
 {
     [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class BetterTimeWarp : MonoBehaviour
     {
-        //public static BetterTimeWarp I1nstance;
-        public static TimeWarpRates StandardWarp = new TimeWarpRates("Standard Warp", new float[] { 1f, 5f, 10f, 50f, 100f, 1000f, 10000f, 100000f }, false);
-        public static TimeWarpRates StandardPhysWarp = new TimeWarpRates("Standard Physics Warp", new float[] { 1f, 2f, 3f, 4f }, true);
-        //public static bool isEnabled = true;
+
+        public static BetterTimeWarp Instance;
+
+        public static TimeWarpRates StandardWarp = new TimeWarpRates("Standard Warp", new float[] { 1f, 5f, 10f, 50f, 100f, 1000f, 10000f, 100000f }, false, true, 4);
+        public static TimeWarpRates StandardPhysWarp = new TimeWarpRates("Standard Physics Warp", new float[] { 1f, 2f, 3f, 4f }, true, false, 4);
         public static ConfigNode SettingsNode;
 
         public List<TimeWarpRates> customWarps = new List<TimeWarpRates>();
@@ -44,7 +42,7 @@ namespace BetterTimeWarp
 
         static Texture2D upArrow;
         static Texture2D downArrow;
-        
+
         public void Start()
         {
             DontDestroyOnLoad(this);
@@ -52,7 +50,7 @@ namespace BetterTimeWarp
                 HighLogic.LoadedScene != GameScenes.FLIGHT &&
                 HighLogic.LoadedScene != GameScenes.TRACKSTATION)
                 return;
-            
+            Instance = this;
             this.skin = HighLogic.Skin;
 
             LoadCustomWarpRates();
@@ -153,8 +151,11 @@ namespace BetterTimeWarp
 
         public void removeLauncherButtons()
         {
-            toolbarControl.OnDestroy();
-            Destroy(toolbarControl);
+            if (toolbarControl != null)
+            {
+                toolbarControl.OnDestroy();
+                Destroy(toolbarControl);
+            }
         }
 
         void InitW()
@@ -261,25 +262,68 @@ namespace BetterTimeWarp
                         }
                     }
                 }
-
+                //CheatOptions.InfiniteElectricity = false;CheatOptions.InfiniteElectricity = false;
                 lastWarpRateIdx = TimeWarp.fetch.current_rate_index;
-
+                if (currentRates.DisableECAtHighWarp )
+                {
+                    if (TimeWarp.fetch.current_rate_index > currentRates.ecIndexDisable)
+                    {
+                        if (!CheatOptions.InfiniteElectricity)
+                        {
+                            CheatOptions.InfiniteElectricity = true;
+                            autoDisable = true;
+                            ScreenMessages.PostScreenMessage("Disabling EC Usage", 5);
+                        }
+                    }
+                    else
+                    {
+                        if (autoDisable)
+                        {
+                            CheatOptions.InfiniteElectricity = false;
+                            autoDisable = false;
+                            ScreenMessages.PostScreenMessage("Enabling EC Usage", 5);
+                        }
+                    }
+                }
             }
         }
+
+        const float quickWidth = 200f;
+        const float quickHeight = 410f;
+
+        const float advWidth = 420f;
+        const float advHeight = quickHeight;
+
+        const float physWidth = 420f;
+        const float physHeight = 220f;
 
         void CreateRectangles()
         {
             if (HighLogic.LoadedSceneIsFlight)
             {
-                quikWindowRect = new Rect(GameSettings.UI_SCALE * 210f /* * ScreenSafeUI.PixelRatio */, 35f, 200f, 410f);
-                advWindowRect = new Rect(GameSettings.UI_SCALE * 210f /* * ScreenSafeUI.PixelRatio */, 35f, 420f, 410f);
-                physSettingsRect = new Rect(GameSettings.UI_SCALE * 210f /* * ScreenSafeUI.PixelRatio */, 445f, 420f, 220f);
+                float x = 210f;
+                quikWindowRect = new Rect(GameSettings.UI_SCALE * x /* * ScreenSafeUI.PixelRatio */, 35f, quickWidth, quickHeight);
+                advWindowRect = new Rect(GameSettings.UI_SCALE * x /* * ScreenSafeUI.PixelRatio */, 35f, advWidth, advHeight);
+                physSettingsRect = new Rect(GameSettings.UI_SCALE * x /* * ScreenSafeUI.PixelRatio */, 445f, physWidth, physHeight);
             }
             else
             {
-                quikWindowRect = new Rect((Screen.width - 205f), 40f, 200f, 410f);
-                advWindowRect = new Rect((Screen.width - 425f), 40f, 420f, 410f);
-                physSettingsRect = new Rect((Screen.width - 425f), 450f, 420f, 220f);
+                if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
+                {
+                    float x = 140;
+                    float y = 58f;
+
+                    quikWindowRect = new Rect(GameSettings.UI_SCALE * x /* * ScreenSafeUI.PixelRatio */, y, quickWidth, quickHeight);
+                    advWindowRect = new Rect(GameSettings.UI_SCALE * x /* * ScreenSafeUI.PixelRatio */, y, advWidth, advHeight);
+                    physSettingsRect = new Rect(GameSettings.UI_SCALE * x /* * ScreenSafeUI.PixelRatio */, y + 410f, physWidth, physHeight);
+
+                }
+                else
+                {
+                    quikWindowRect = new Rect((Screen.width - 205f), 40f, quickWidth, quickHeight);
+                    advWindowRect = new Rect((Screen.width - 425f), 40f, advWidth, advHeight);
+                    physSettingsRect = new Rect((Screen.width - 425f), 450f, physWidth, physHeight);
+                }
             }
         }
 
@@ -317,13 +361,14 @@ namespace BetterTimeWarp
                 GUI.skin = skin;
 
                 //flight
-                if (HighLogic.LoadedSceneIsFlight && !HighLogic.CurrentGame.Parameters.CustomParams<BTWCustomParams>().hideDropdownButtonInFlight)
+                if ((HighLogic.LoadedSceneIsFlight || HighLogic.LoadedScene == GameScenes.SPACECENTER)
+                    && !HighLogic.CurrentGame.Parameters.CustomParams<BTWCustomParams>().hideDropdownButtonInFlight)
                 {
                     const float ICON_WIDTH = 28;
                     const float ICON_BASE = 203f + 80; // 32f added for KSP 1.12
 
                     float y = ICON_BASE;
-
+                    float x = 0;
                     var tu = TelemetryUpdate.Instance;
 
                     if (tu != null && CommNetScenario.CommNetEnabled)
@@ -349,17 +394,18 @@ namespace BetterTimeWarp
                         scale = GameSettings.UI_SCALE * GameSettings.UI_SCALE_TIME;
                         widthAndHeight *= scale;
                     }
-
+                    if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
+                    {
+                        x = 24f;
+                        y += 56f;
+                    }
                     if (buttonContent != null)
                     {
-                        var b = GUI.Toggle(new Rect(scale * y, 0f, widthAndHeight, widthAndHeight), windowOpen, buttonContent, skin.button);
+                        var b = GUI.Toggle(new Rect(scale * y, x, widthAndHeight, widthAndHeight), windowOpen, buttonContent, skin.button);
                         if (b != windowOpen)
                         {
                             windowOpen = b;
-
-                            // CreateRectangles();
                         }
-
                     }
                 }
 
@@ -389,15 +435,9 @@ namespace BetterTimeWarp
 
         string warpName = "Name";
         bool physics = false;
-#if false
-        string w1 = "10";
-        string w2 = "100";
-        string w3 = "1000";
-        string w4 = "10000";
-        string w5 = "100000";
-        string w6 = "1000000";
-        string w7 = "10000000";
-#endif
+        bool disableECAtHighWarp = false;
+        int ecIndexDisable = 7;
+        internal bool autoDisable = false;
 
         TimeWarpRates currentRates = StandardWarp;
         int selected = 0;
@@ -411,6 +451,7 @@ namespace BetterTimeWarp
         TimeWarpRates[] warpRates = new TimeWarpRates[] { };
         List<string> physNames = new List<string>();
         TimeWarpRates[] physRates = new TimeWarpRates[] { };
+
         void Update()
         {
             warpNames.Clear();
@@ -498,289 +539,218 @@ namespace BetterTimeWarp
         string[] w = new string[8];
 
         string[] names = new string[] { };
+
         public void TimeWarpWindow(int id)
         {
-            GUILayout.BeginHorizontal();
-            GUILayout.BeginVertical();
-
-            scrollPos = GUILayout.BeginScrollView(scrollPos);
-
-            editToggle = GUILayout.Toggle(editToggle, "Create", skin.button);
-            selected = GUILayout.SelectionGrid(selected, names, 1, smallButtonStyle);
-
-            currentRates = customWarps.Find(r => r.Name == names[selected] ||
-                (names[selected].Contains("<") && names[selected].Split('<', '>')[2] == r.Name)
-                );
-            
-            if (currentRates == null)
-                currentRates = StandardWarp;
-
-            GUILayout.EndScrollView();
-
-            GUILayout.EndVertical();
-
-            GUILayout.BeginVertical();
-            scrollPos2 = GUILayout.BeginScrollView(scrollPos2);
-
-            if (editToggle)
+            using (new GUILayout.HorizontalScope())
             {
-                bool canExport = true;
-
-                GUILayout.BeginVertical(GUILayout.ExpandHeight(true));
-
-                warpName = GUILayout.TextField(warpName);
-                for (int i = 1; i < 8; i++)
+                using (new GUILayout.VerticalScope())
                 {
-                    if (i < 4 || !physics)
-                        w[i] = GUILayout.TextField(w[i]);
+                    scrollPos = GUILayout.BeginScrollView(scrollPos);
+
+                    editToggle = GUILayout.Toggle(editToggle, "Create", skin.button);
+                    selected = GUILayout.SelectionGrid(selected, names, 1, smallButtonStyle);
+
+                    currentRates = customWarps.Find(r => r.Name == names[selected] ||
+                        (names[selected].Contains("<") && names[selected].Split('<', '>')[2] == r.Name)
+                        );
+
+                    if (currentRates == null)
+                        currentRates = StandardWarp;
+
+                    GUILayout.EndScrollView();
                 }
-#if false
-                w1 = GUILayout.TextField(w1);
-                w2 = GUILayout.TextField(w2);
-                w3 = GUILayout.TextField(w3);
-                if (!physics)
+
+                using (new GUILayout.VerticalScope())
                 {
-                    w4 = GUILayout.TextField(w4);
-                    w5 = GUILayout.TextField(w5);
-                    w6 = GUILayout.TextField(w6);
-                    w7 = GUILayout.TextField(w7);
-                }
-#endif
-                physics = GUILayout.Toggle(physics, "Physics Warp?");
+                    scrollPos2 = GUILayout.BeginScrollView(scrollPos2);
 
-                GUILayout.EndVertical();
-
-                if (GUILayout.Button("Save"))
-                {
-                    float[] rates;
-                    if (physics)
-                        rates = new float[4];
-                    else
-                        rates = new float[8];
-
-                    rates[0] = 1f;
-
-                    float pw;
-                    for (int i = 1; i < 8; i++)
+                    if (editToggle)
                     {
-                        if (i < 4 || !physics)
+                        bool canExport = true;
+
+                        using (new GUILayout.VerticalScope(GUILayout.ExpandHeight(true)))
                         {
-                            if (float.TryParse(w[i], out pw))
-                                rates[i] = pw;
+                            warpName = GUILayout.TextField(warpName);
+
+                            for (int i = 1; i < 8; i++)
+                            {
+                                if (i < 4 || !physics)
+                                {
+                                    using (new GUILayout.HorizontalScope())
+                                    {
+                                        GUILayout.Label($"{i}. ", GUILayout.Width(20));
+                                        w[i] = GUILayout.TextField(w[i]);
+                                    }
+                                }
+                            }
+                            physics = GUILayout.Toggle(physics, "Physics Warp?");
+                            if (!physics)
+                            {
+                                disableECAtHighWarp = GUILayout.Toggle(disableECAtHighWarp, new GUIContent("Disable EC usage", "Disable EC usage at high warp rates"));
+                                using (new GUILayout.HorizontalScope())
+                                {
+                                    GUILayout.Label("Disable Index: ");
+                                    if (GUILayout.Button("<") && ecIndexDisable > 1)
+                                        ecIndexDisable--;
+                                    GUILayout.Label(ecIndexDisable.ToString());
+                                    if (GUILayout.Button(">") && ecIndexDisable < 7)
+                                        ecIndexDisable++;
+                                }
+                            }
+                        }
+                        if (GUILayout.Button("Save"))
+                        {
+                            float[] rates;
+                            if (physics)
+                                rates = new float[4];
                             else
-                                canExport = false;
-                        }
-                    }
-#if false
-                    float pw1;
-                    if (float.TryParse(w1, out pw1))
-                        rates[1] = pw1;
-                    else
-                        canExport = false;
-                    float pw2;
-                    if (float.TryParse(w2, out pw2))
-                        rates[2] = pw2;
-                    else
-                        canExport = false;
-                    float pw3;
-                    if (float.TryParse(w3, out pw3))
-                        rates[3] = pw3;
-                    else
-                        canExport = false;
-                    if (!physics)
-                    {
-                        float pw4;
-                        if (float.TryParse(w4, out pw4))
-                            rates[4] = pw4;
-                        else
-                            canExport = false;
-                        float pw5;
-                        if (float.TryParse(w5, out pw5))
-                            rates[5] = pw5;
-                        else
-                            canExport = false;
-                        float pw6;
-                        if (float.TryParse(w6, out pw6))
-                            rates[6] = pw6;
-                        else
-                            canExport = false;
-                        float pw7;
-                        if (float.TryParse(w7, out pw7))
-                            rates[7] = pw7;
-                        else
-                            canExport = false;
-                    }
-#endif
-                    if (canExport)
-                    {
-                        TimeWarpRates timeWarpRates = new TimeWarpRates(warpName, rates, physics);
-                        customWarps.Add(timeWarpRates);
-                        SaveCustomWarpRates();
-                        editToggle = false;
-                        //SetWarpRates (timeWarpRates);
-                        warpName = "Name";
-                        physics = false;
-                        InitW();
-#if false
-                        w[1] = "10";
-                        w[2] = "100";
-                        w[3] = "1000";
-                        w[4] = "10000";
-                        w[5] = "100000";
-                        w[6] = "1000000";
-                        w[7] = "10000000";
-#endif
-                    }
-                    else
-                    {
-                        //PopupDialog.SpawnPopupDialog (new MultiOptionDialog("Cannot save because there are non-numbers in the editing fields", "Error", null), false, null);
-                        var dialog = new MultiOptionDialog("btw1", "Cannot save because there are non-numbers in the editing fields", "Error", HighLogic.UISkin, new DialogGUIBase[] {
+                                rates = new float[8];
+
+                            rates[0] = 1f;
+
+                            float pw;
+                            for (int i = 1; i < 8; i++)
+                            {
+                                if (i < 4 || !physics)
+                                {
+                                    if (float.TryParse(w[i], out pw))
+                                        rates[i] = pw;
+                                    else
+                                        canExport = false;
+                                }
+                            }
+
+                            if (canExport)
+                            {
+                                TimeWarpRates timeWarpRates = new TimeWarpRates(warpName, rates, physics, disableECAtHighWarp, ecIndexDisable);
+                                customWarps.Add(timeWarpRates);
+                                SaveCustomWarpRates();
+                                editToggle = false;
+                                //SetWarpRates (timeWarpRates);
+                                warpName = "Name";
+                                physics = false;
+                                InitW();
+                            }
+                            else
+                            {
+                                //PopupDialog.SpawnPopupDialog (new MultiOptionDialog("Cannot save because there are non-numbers in the editing fields", "Error", null), false, null);
+                                var dialog = new MultiOptionDialog("btw1", "Cannot save because there are non-numbers in the editing fields", "Error", HighLogic.UISkin, new DialogGUIBase[] {
                                                                                      new DialogGUIButton ("OK", () => { })
                                                 });
-                        PopupDialog.SpawnPopupDialog(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), dialog, false, HighLogic.UISkin, true);
-                    }
-                    //save the settings, so if they have been regenerated, it exsists and wont cause errors
-                    BetterTimeWarp.SettingsNode.Save(BetterTimeWarpInitializer.BTW_CFG_FILE);
-                }
-                if (GUILayout.Button("Cancel", smallButtonStyle))
-                {
-                    editToggle = false;
-                    warpName = "Name";
-                    physics = false;
-                    InitW();
-#if false
-                    w[1] = "10";
-                    w[2] = "100";
-                    w[3] = "1000";
-                    w[4] = "10000";
-                    w[5] = "100000";
-                    w[6] = "1000000";
-                    w[7] = "10000000";
-#endif
-                }
-            }
-            else
-            {
-                GUILayout.BeginVertical(GUILayout.ExpandHeight(true));
-                for (int i = 1; i <= 8; i++)
-                {
-                    if (i <= 4 || !currentRates.Physics)
-                    {
-                        var f = currentRates.Rates[i - 1];
-                        GUILayout.Label("<b><color=lime>" + i.ToString() + ":</color></b> <color=white>" + f.ToString(TimeWarpRates.rateFmt(f)) + "x</color>");
-                    }
-                }
-#if false
-                GUILayout.Label("<b><color=lime>1:</color></b> <color=white>" + currentRates.Rates[0].ToString(TimeWarpRates.rateFmt(currentRates.Rates[0]) + "x</color>");
-                GUILayout.Label("<b><color=lime>2:</color></b> <color=white>" + currentRates.Rates[1].ToString("N0") + "x</color>");
-                GUILayout.Label("<b><color=lime>3:</color></b> <color=white>" + currentRates.Rates[2].ToString("N0") + "x</color>");
-                GUILayout.Label("<b><color=lime>4:</color></b> <color=white>" + currentRates.Rates[3].ToString("N0") + "x</color>");
-                if (!currentRates.Physics)
-                {
-                    GUILayout.Label("<b><color=lime>5:</color></b> <color=white>" + currentRates.Rates[4].ToString("N0") + "x</color>");
-                    GUILayout.Label("<b><color=lime>6:</color></b> <color=white>" + currentRates.Rates[5].ToString("N0") + "x</color>");
-                    GUILayout.Label("<b><color=lime>7:</color></b> <color=white>" + currentRates.Rates[6].ToString("N0") + "x</color>");
-                    GUILayout.Label("<b><color=lime>8:</color></b> <color=white>" + currentRates.Rates[7].ToString("N0") + "x</color>");
-                }
-#endif
-                GUILayout.EndVertical();
-
-                GUILayout.Space(15f);
-                if (GUILayout.Button("Select"))
-                {
-                    SetWarpRates(currentRates);
-                }
-                if (currentRates != StandardWarp && currentRates != StandardPhysWarp && GUILayout.Button("Edit", smallButtonStyle))
-                {
-                    if (currentRates != StandardWarp && currentRates != StandardPhysWarp)
-                    {
-                        if (!currentRates.Physics)
-                            SetWarpRates(StandardWarp, false);
-                        else
-                            SetWarpRates(StandardPhysWarp, false);
-                        customWarps.Remove(currentRates);
-                        editToggle = true;
-                        warpName = currentRates.Name;
-                        physics = currentRates.Physics;
-
-                        for (int i = 1; i < 8; i++)
-                        {
-                            if (i < 4 || !physics)
-                                w[i] = currentRates.Rates[i].ToString(TimeWarpRates.rateFmt(currentRates.Rates[i]));
+                                PopupDialog.SpawnPopupDialog(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), dialog, false, HighLogic.UISkin, true);
+                            }
+                            //save the settings, so if they have been regenerated, it exsists and wont cause errors
+                            BetterTimeWarp.SettingsNode.Save(BetterTimeWarpInitializer.BTW_CFG_FILE);
                         }
-#if false
-                        w1 = currentRates.Rates[1].ToString(TimeWarpRates.rateFmt(currentRates.Rates[1]));
-                        w2 = currentRates.Rates[2].ToString(TimeWarpRates.rateFmt(currentRates.Rates[2]));
-                        w3 = currentRates.Rates[3].ToString(TimeWarpRates.rateFmt(currentRates.Rates[3]));
-                        if (!physics)
+                        if (GUILayout.Button("Cancel", smallButtonStyle))
                         {
-                            w4 = currentRates.Rates[4].ToString(TimeWarpRates.rateFmt(currentRates.Rates[4]));
-                            w5 = currentRates.Rates[5].ToString(TimeWarpRates.rateFmt(currentRates.Rates[5]));
-                            w6 = currentRates.Rates[6].ToString(TimeWarpRates.rateFmt(currentRates.Rates[6]));
-                            w7 = currentRates.Rates[7].ToString(TimeWarpRates.rateFmt(currentRates.Rates[7]));
+                            editToggle = false;
+                            warpName = "Name";
+                            physics = false;
+                            InitW();
                         }
-#endif
-                        selected = 0;
                     }
                     else
                     {
-                        //PopupDialog.SpawnPopupDialog (new MultiOptionDialog("Cannot edit standard warp rates", "Better Time Warp", null), true, null);
+                        GUILayout.BeginVertical(GUILayout.ExpandHeight(true));
+                        for (int i = 1; i <= 8; i++)
+                        {
+                            if (i <= 4 || !currentRates.Physics)
+                            {
+                                var f = currentRates.Rates[i - 1];
+                                GUILayout.Label("<b><color=lime>" + i.ToString() + ":</color></b> <color=white>" + f.ToString(TimeWarpRates.rateFmt(f)) + "x</color>");
+                            }
+                        }
+                        GUILayout.EndVertical();
 
-                        var dialog = new MultiOptionDialog("btw2", "Cannot edit standard warp rates", "Better Time Warp", HighLogic.UISkin, new DialogGUIBase[] {
+                        GUILayout.Space(15f);
+                        if (GUILayout.Button("Select"))
+                        {
+                            SetWarpRates(currentRates);
+                        }
+                        if (currentRates != StandardWarp && currentRates != StandardPhysWarp && GUILayout.Button("Edit", smallButtonStyle))
+                        {
+                            if (currentRates != StandardWarp && currentRates != StandardPhysWarp)
+                            {
+                                if (!currentRates.Physics)
+                                    SetWarpRates(StandardWarp, false);
+                                else
+                                    SetWarpRates(StandardPhysWarp, false);
+                                customWarps.Remove(currentRates);
+                                editToggle = true;
+                                warpName = currentRates.Name;
+                                physics = currentRates.Physics;
+                                disableECAtHighWarp = currentRates.DisableECAtHighWarp;
+                                ecIndexDisable = currentRates.ecIndexDisable;
+
+                                for (int i = 1; i < 8; i++)
+                                {
+                                    if (i < 4 || !physics)
+                                        w[i] = currentRates.Rates[i].ToString(TimeWarpRates.rateFmt(currentRates.Rates[i]));
+                                }
+                                selected = 0;
+                            }
+                            else
+                            {
+                                //PopupDialog.SpawnPopupDialog (new MultiOptionDialog("Cannot edit standard warp rates", "Better Time Warp", null), true, null);
+
+                                var dialog = new MultiOptionDialog("btw2", "Cannot edit standard warp rates", "Better Time Warp", HighLogic.UISkin, new DialogGUIBase[] {
                                                                                      new DialogGUIButton ("OK", () => { })
                                                 });
-                        PopupDialog.SpawnPopupDialog(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), dialog, false, HighLogic.UISkin, true);
+                                PopupDialog.SpawnPopupDialog(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), dialog, false, HighLogic.UISkin, true);
 
-                    }
-                }
-                if (currentRates != StandardWarp && currentRates != StandardPhysWarp && GUILayout.Button("Delete", smallButtonStyle))
-                {
-                    if (currentRates != StandardWarp && currentRates != StandardPhysWarp)
-                    {
-                        customWarps.Remove(currentRates);
-                        selected = 0;
-                        SaveCustomWarpRates();
-                        //	PopupDialog.SpawnPopupDialog (new MultiOptionDialog("Deleted " + currentRates.Name + " time warp rates", "Better Time Warp", null), true, null);
+                            }
+                        }
+                        if (currentRates != StandardWarp && currentRates != StandardPhysWarp && GUILayout.Button("Delete", smallButtonStyle))
+                        {
+                            if (currentRates != StandardWarp && currentRates != StandardPhysWarp)
+                            {
+                                customWarps.Remove(currentRates);
+                                selected = 0;
+                                SaveCustomWarpRates();
+                                //	PopupDialog.SpawnPopupDialog (new MultiOptionDialog("Deleted " + currentRates.Name + " time warp rates", "Better Time Warp", null), true, null);
 
 
 
-                        var dialog = new MultiOptionDialog("btw3", "Deleted " + currentRates.Name + " time warp rates", "Better Time Warp", HighLogic.UISkin, new DialogGUIBase[] {
+                                var dialog = new MultiOptionDialog("btw3", "Deleted " + currentRates.Name + " time warp rates", "Better Time Warp", HighLogic.UISkin, new DialogGUIBase[] {
                                                                                      new DialogGUIButton ("OK", () => { 
                                                            // winState = winContent.close;
                                                         })
                                                 });
-                        PopupDialog.SpawnPopupDialog(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), dialog, false, HighLogic.UISkin, true);
-                        // winState = winContent.dialog;
+                                PopupDialog.SpawnPopupDialog(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), dialog, false, HighLogic.UISkin, true);
+                                // winState = winContent.dialog;
 
 
 
 
-                        SetWarpRates(StandardWarp, false);
-                    }
-                    else
-                    {
-                        //PopupDialog.SpawnPopupDialog (new MultiOptionDialog("Cannot delete standard warp rates", "Better Time Warp", null), true, null);
+                                SetWarpRates(StandardWarp, false);
+                            }
+                            else
+                            {
+                                //PopupDialog.SpawnPopupDialog (new MultiOptionDialog("Cannot delete standard warp rates", "Better Time Warp", null), true, null);
 
-                        var dialog = new MultiOptionDialog("btw4", "Cannot delete standard warp rates", "Better Time Warp", HighLogic.UISkin, new DialogGUIBase[] {
+                                var dialog = new MultiOptionDialog("btw4", "Cannot delete standard warp rates", "Better Time Warp", HighLogic.UISkin, new DialogGUIBase[] {
                                                                                      new DialogGUIButton ("OK", () => { })
                                                 });
-                        PopupDialog.SpawnPopupDialog(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), dialog, false, HighLogic.UISkin, true);
+                                PopupDialog.SpawnPopupDialog(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), dialog, false, HighLogic.UISkin, true);
 
+                            }
+                        }
                     }
+                    GUILayout.EndScrollView();
                 }
+
             }
-            GUILayout.EndScrollView();
-            GUILayout.EndVertical();
 
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Simple", GUILayout.ExpandWidth(true)))
+            using (new GUILayout.HorizontalScope())
             {
-                advWindowOpen = false;
+                if (GUILayout.Button("Simple", GUILayout.ExpandWidth(true)))
+                {
+                    advWindowOpen = false;
+                }
+                showPhysicsSettings = GUILayout.Toggle(showPhysicsSettings, "<color=lime>Physics Settings</color>", skin.button, GUILayout.ExpandWidth(true));
             }
-            showPhysicsSettings = GUILayout.Toggle(showPhysicsSettings, "<color=lime>Physics Settings</color>", skin.button, GUILayout.ExpandWidth(true));
-            GUILayout.EndHorizontal();
             if (!lockWindow())
                 GUI.DragWindow();
         }
@@ -818,7 +788,7 @@ namespace BetterTimeWarp
 
         void FixedUpdate()
         {
-            if (TimeWarp.fetch != null &&  TimeWarp.fetch.Mode == TimeWarp.Modes.HIGH && UseLosslessPhysics && Time.timeScale < 100f)
+            if (TimeWarp.fetch != null && TimeWarp.fetch.Mode == TimeWarp.Modes.HIGH && UseLosslessPhysics && Time.timeScale < 100f)
             {
                 if (Time.timeScale == 1f)
                 {
@@ -856,7 +826,7 @@ namespace BetterTimeWarp
                 }
             }
         }
-        
+
         public void SetWarpRates(TimeWarpRates rates, bool message = true)
         {
             if (TimeWarp.fetch != null)
@@ -903,38 +873,11 @@ namespace BetterTimeWarp
             }
             Log.Warning("Failed to set warp rates");
 
-#if false
-            //reset it to standard in case of  failiure
-            if (rates.Physics)
-            {
-                for (var i = 0; i < physRates.Length; i++)
-                {
-                    var r = physRates[i];
-                    if (r == StandardPhysWarp)
-                    {
-                        currPhysIndex = i;
-                        CurrentPhysWarp = StandardPhysWarp;
-                    }
-                }
-            }
-            else
-            {
-                for (var i = 0; i < warpRates.Length; i++)
-                {
-                    var r = warpRates[i];
-                    if (r == StandardWarp)
-                    {
-                        currWarpIndex = i;
-                        CurrentWarp = StandardWarp;
-                        Log.Info("CurrentWarp set to StandardWarp  1");
-                    }
-                }
-            }
-#endif
         }
 
         private void LoadCustomWarpRates()
         {
+            Log.Info("LoadCustomWarpRates A1");
             if (BetterTimeWarp.SettingsNode == null)
                 BetterTimeWarp.SettingsNode = new ConfigNode();
             if (!SettingsNode.HasNode("BetterTimeWarp"))
@@ -959,6 +902,36 @@ namespace BetterTimeWarp
             {
                 string name = cNode.GetValue("name");
                 bool physics = bool.Parse(cNode.GetValue("physics"));
+                bool disable = false;
+                if (node.HasValue("DisableECAtHighWarp"))
+                {
+
+                    string str = cNode.GetValue("DisableECAtHighWarp");
+                    try
+                    {
+                        disable = bool.Parse(str);
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error("DisableECAtHighWarp: " + str);
+                    }
+                }
+                else
+                    disable = false;
+                if (node.HasValue("ecIndexDisable"))
+                {
+                    string str = cNode.GetValue("ecIndexDisable");
+                    Log.Info("ecIndexDisable: " + str);
+                    try
+                    {
+                        ecIndexDisable = int.Parse(str);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("ecIndexDisable value: " + str);
+                    }
+
+                }
                 float[] rates;
                 if (physics)
                     rates = new float[4];
@@ -969,22 +942,11 @@ namespace BetterTimeWarp
                 {
                     if (i < 4 || !physics)
                     {
+                        string str = cNode.GetValue("warpRate" + i.ToString());
                         rates[i] = float.Parse(cNode.GetValue("warpRate" + i.ToString()));
                     }
                 }
-#if false
-                rates[1] = float.Parse(cNode.GetValue("warpRate1"));
-                rates[2] = float.Parse(cNode.GetValue("warpRate2"));
-                rates[3] = float.Parse(cNode.GetValue("warpRate3"));
-                if (!physics)
-                {
-                    rates[4] = float.Parse(cNode.GetValue("warpRate4"));
-                    rates[5] = float.Parse(cNode.GetValue("warpRate5"));
-                    rates[6] = float.Parse(cNode.GetValue("warpRate6"));
-                    rates[7] = float.Parse(cNode.GetValue("warpRate7"));
-                }
-#endif
-                customWarps.Add(new TimeWarpRates(name, rates, physics));
+                customWarps.Add(new TimeWarpRates(name, rates, physics, disable, 4));
             }
 
             //populate the seperate arrays
@@ -1039,19 +1001,9 @@ namespace BetterTimeWarp
                             rateNode.AddValue("warpRate" + i.ToString(), rates.Rates[i].ToString(TimeWarpRates.rateFmt(rates.Rates[i])));
                         }
                     }
-#if false
-                    rateNode.AddValue("warpRate1", rates.Rates[1]);
-                    rateNode.AddValue("warpRate2", rates.Rates[2]);
-                    rateNode.AddValue("warpRate3", rates.Rates[3]);
-                    if (!rates.Physics)
-                    {
-                        rateNode.AddValue("warpRate4", rates.Rates[4]);
-                        rateNode.AddValue("warpRate5", rates.Rates[5]);
-                        rateNode.AddValue("warpRate6", rates.Rates[6]);
-                        rateNode.AddValue("warpRate7", rates.Rates[7]);
-                    }
-#endif
                     rateNode.AddValue("physics", rates.Physics);
+                    rateNode.AddValue("DisableECAtHighWarp", rates.DisableECAtHighWarp);
+                    rateNode.AddValue("ecIndexDisable", rates.ecIndexDisable);
                     node.AddNode(rateNode);
                 }
             }

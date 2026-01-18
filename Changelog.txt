@@ -158,3 +158,7 @@
 	Updated version file to use github for new version info
 	Copied webpage to Readme.md file
 	Minor variable change for better readability
+
+2.3.14
+	Added option to enable infinite EC when timewarp gets too high
+	Added dropdown to spacecenter

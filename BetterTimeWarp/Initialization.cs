@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace BetterTimeWarp
@@ -53,19 +52,13 @@ namespace BetterTimeWarp
 
                 node = BetterTimeWarp.SettingsNode.GetNode("BetterTimeWarp");
 
-#if false
-                if (!HighLogic.CurrentGame.Parameters.CustomParams<BTWCustomParams>().enabled)
-				{
-					Debug.LogError ("[BetterTimeWarp]: enabled = false in settings, disabling BetterTimeWarp");
-					return;
-				}
-#endif
                 //save the settings, so if they have been regenerated, it exsists and wont cause errors
                 BetterTimeWarp.SettingsNode.Save(BTW_CFG_FILE);
 
                 //subscribe to the events so that the settings save and the UI can hide/show
                 GameEvents.onGameStateSaved.Add(SaveSettings);
                 GameEvents.onGameStateLoad.Add(onGameStateLoad);
+                GameEvents.onLevelWasLoaded.Add(onLevelWasLoaded);
                 GameEvents.onShowUI.Add(ShowUI);
                 GameEvents.onHideUI.Add(HideUI);
 
@@ -88,6 +81,9 @@ namespace BetterTimeWarp
         {
             GameEvents.onGameStateSaved.Remove(SaveSettings);
             GameEvents.onGameStateLoad.Remove(onGameStateLoad);
+            GameEvents.onLevelWasLoaded.Remove(onLevelWasLoaded);
+
+
             GameEvents.onShowUI.Remove(ShowUI);
             GameEvents.onHideUI.Remove(HideUI);
         }
@@ -101,15 +97,23 @@ namespace BetterTimeWarp
             HighLogic.CurrentGame.Parameters.CustomParams<BTWCustomParams2>().StockAutosaveShortInterval =
                 (int)GameSettings.AUTOSAVE_SHORT_INTERVAL;
         }
-#if false
-        private void OnLevelLoaded(GameScenes scene)
-		{
-			//call this every scene that needs BetterTimeWarp
-			if (scene == GameScenes.FLIGHT || scene == GameScenes.SPACECENTER || scene == GameScenes.TRACKSTATION)
-			{
-				BetterTimeWarp.Instance = gameObject.AddComponent<BetterTimeWarp> ();
-			}
-		}
+
+#if true
+        private void onLevelWasLoaded(GameScenes scene)
+        {
+            //call this every scene that needs BetterTimeWarp
+            if (scene == GameScenes.FLIGHT || scene == GameScenes.SPACECENTER || scene == GameScenes.TRACKSTATION)
+            {
+                BetterTimeWarp.Instance = gameObject.AddComponent<BetterTimeWarp>();
+                if (BetterTimeWarp.Instance != null && BetterTimeWarp.Instance.autoDisable)
+                {
+                    CheatOptions.InfiniteElectricity = false;
+                    BetterTimeWarp.Instance.autoDisable = false;
+                    ScreenMessages.PostScreenMessage("Enabling EC Usage", 5);
+                }
+
+            }
+        }
 #endif
         //called whenever the game autosaves/quicksaves
         void SaveSettings(Game game)

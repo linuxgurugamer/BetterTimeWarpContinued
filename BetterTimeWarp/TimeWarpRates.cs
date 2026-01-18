@@ -10,12 +10,16 @@ namespace BetterTimeWarp
 		public string Name;
 		public float[] Rates;
 		public bool Physics;
+		public bool DisableECAtHighWarp;
+		public int ecIndexDisable;
 
-		public TimeWarpRates(string name, float[] rates, bool physics)
+        public TimeWarpRates(string name, float[] rates, bool physics, bool disable, int ecIndexDisable)
 		{
 			this.Name = name;
 			this.Rates = rates;
 			this.Physics = physics;
+			this.DisableECAtHighWarp = disable;
+			this.ecIndexDisable = ecIndexDisable;
 		}
 		public TimeWarpRates()
 		{
