@@ -455,28 +455,38 @@ namespace BetterTimeWarp
 
         void Update()
         {
-            warpNames.Clear();
-            physNames.Clear();
-            warpRates = customWarps.Where(r => !r.Physics).ToArray();
-            physRates = customWarps.Where(r => r.Physics).ToArray();
-
-            foreach (var rates in customWarps)
+            // These per-rate arrays + colour-coded name strings are ONLY consumed by the warp-selection
+            // window (drawn only while windowOpen); customWarps only changes at load (LoadCustomWarpRates
+            // already populates warpRates/physRates there) or via the window's own add/remove handlers
+            // (which run while windowOpen). Rebuilding them EVERY frame - two LINQ ToArray() + per-rate
+            // string concat + a Concat().ToArray() - was ~3.9 KB/frame of pure GC pressure while the
+            // window was closed (i.e. almost always). Gate on windowOpen: closed = zero allocation,
+            // open = identical behaviour (live <color=lime> highlight).
+            if (windowOpen)
             {
-                string sB = "";
-                string sA = "";
-                if (rates == CurrentWarp || rates == CurrentPhysWarp)
+                warpNames.Clear();
+                physNames.Clear();
+                warpRates = customWarps.Where(r => !r.Physics).ToArray();
+                physRates = customWarps.Where(r => r.Physics).ToArray();
+
+                foreach (var rates in customWarps)
                 {
-                    sB = "<color=lime>";
-                    sA = "</color>";
+                    string sB = "";
+                    string sA = "";
+                    if (rates == CurrentWarp || rates == CurrentPhysWarp)
+                    {
+                        sB = "<color=lime>";
+                        sA = "</color>";
+                    }
+
+                    if (rates.Physics)
+                        physNames.Add(sB + rates.Name + sA);
+                    else
+                        warpNames.Add(sB + rates.Name + sA);
                 }
 
-                if (rates.Physics)
-                    physNames.Add(sB + rates.Name + sA);
-                else
-                    warpNames.Add(sB + rates.Name + sA);
+                names = warpNames.Concat(physNames).ToArray();
             }
-
-            names = warpNames.Concat(physNames).ToArray();
 
             //make camera speed not change with time warp
             if (ScaleCameraSpeed && Time.timeScale < 1f)
