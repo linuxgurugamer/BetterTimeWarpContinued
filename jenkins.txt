@@ -33,6 +33,7 @@
 3:BetterTimeWarp.version,GameData/BetterTimeWarp
 3:License.txt,GameData/BetterTimeWarp
 3:Readme.md,GameData/BetterTimeWarp
+3:Changelog.cfg,GameData/BetterTimeWarp
 
 # 4:SOURCDIR, DESTDIR
 #4:Textures,GameData/ManeuverQueue/Textures

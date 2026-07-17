@@ -165,3 +165,8 @@
 
 2.3.14.1
 	Fix bug where multiple buttons were being added to the toolbar after each scene change
+
+2.3.14.2
+	Added support for the KerbalChangelog mod
+	Thanks to github user @ZIXIONGLUO for this:
+		Gate the per-frame warp-name rebuild on windowOpen
